@@ -1,0 +1,20 @@
+name:                transducers
+version:             0.1.0.0
+synopsis:            All-natural stream processing
+-- description:
+homepage:            https://github.com/lpeterse/haskell-transducers
+license:             MIT
+license-file:        LICENSE
+author:              Lars Petersen
+maintainer:          info@lars-petersen.net
+copyright:           (c) 2016 Lars Petersen
+category:            Control
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     Control.Transducer
+  build-depends:       base >=4.8 && <4.9
+  hs-source-dirs:      src
+  default-language:    Haskell2010
