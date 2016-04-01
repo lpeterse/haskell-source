@@ -2,8 +2,6 @@
 module Data.Source where
 
 import Control.Monad
-import System.IO
-
 import Prelude hiding ( repeat, replicate )
 
 -- |
@@ -33,19 +31,30 @@ prepend     a = pure . Yield a
 repeat       :: Monad m => a -> Source m a
 repeat      a = pure $ Yield a $ repeat a
 
-replicate    :: (Monad m, Integral i) => Int -> a -> Source m a
+replicate    :: (Monad m, Integral i) => i -> a -> Source m a
 replicate 0 _ = pure Termination
 replicate i a = pure $ Yield a $ replicate (pred i) a
 
 instance Monad m => Functor (Yield m) where
   fmap f (Yield a src)       = Yield (f a) (fmap f <$> src)
-  fmap f Exhaustion          = Exhaustion
-  fmap f Termination         = Termination
+  fmap _ Exhaustion          = Exhaustion
+  fmap _ Termination         = Termination
 
 instance Monad m => Applicative (Yield m) where
-  pure                      a = Yield a (return Termination)
+  pure                      a = Yield a (pure Termination)
   Yield f sf  <*>  Yield a sa = Yield (f a) $ sf >>= \g-> liftM (g <*>) sa
   Exhaustion  <*>           _ = Exhaustion
   _           <*>  Exhaustion = Exhaustion
   Termination <*>           _ = Termination
   _           <*> Termination = Termination
+
+instance Monad m => Monoid (Yield m a) where
+  Yield a sa  `mappend`    yb = Yield a (f sa)
+    where
+      f sc = sc >>= \yc-> case yc of
+        Yield d sd  -> pure $ Yield d (f sd)
+        Exhaustion  -> pure Exhaustion
+        Termination -> pure yb
+  Exhaustion  `mappend`     _ = Exhaustion
+  Termination `mappend`    yb = yb
+  mempty                      = Termination
