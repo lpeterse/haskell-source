@@ -1,44 +1,33 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TupleSections #-}
 module Data.Source where
 
-import Prelude hiding (head, tail)
+import Control.Arrow ((&&&))
+import Control.Monad
 import System.IO
 
+-- |
+--
+-- * A source that once returned Nothing must always return Nothing in the future
 newtype Source     m o   = Source { pull :: m (Maybe (o, Source m o)) }
 type    Transducer m i o = Source m i -> Source m o
 
-push             :: Monad m => o -> Source m o -> Source m o
-push o source     = Source $ return $ Just (o, source)
+term  :: Monad m => Source m o
+term   = Source (return Nothing)
 
-exhausted        :: Monad m => Source m o
-exhausted         = Source $ return Nothing
-
-drain :: Monad m => Source m o -> m ()
-drain source =
-  pull source >>= maybe (return ()) (drain . snd)
+push  :: Monad m => o -> Source m o -> Source m o
+push   = curry (Source . return . Just)
 
 peek  :: Monad m => Source m o -> m (Maybe (o, Source m o))
-peek source = (f <$>) <$> pull source
-  where
-    f (o, source') = (o, push o source')
+peek   = fmap (fmap (fst &&& uncurry push)) . pull
 
-take :: Monad m => Int -> Transducer m [i] [i]
-take i source = Source $ pull source >>= \m-> case m of
-  Nothing -> return Nothing
-  Just xs -> undefined
+drain :: Monad m => Source m o -> m ()
+drain  = (=<<) (maybe (return ()) (drain . snd)) . pull
 
-head :: Monad m => Transducer m [i] i
-head source = Source $ pull source >>= maybe (return Nothing) f
-  where
-    f ([],   source') = pull $ head source'
-    f (x:xs, source') = return $ Just (x, head $ push xs source')
+transducer :: Monad m => (i -> Transducer m i o) -> Transducer m i o
+transducer f source = Source $ pull source >>= \m-> case m of
+  Nothing            -> return Nothing
+  Just (i, source')  -> pull $ f i source'
 
-tail :: Monad m => Transducer m [i] [i]
-tail source = Source $ pull source >>= maybe (return Nothing) f
-  where
-    f (_:xs, source') = pull $ push xs source'
-    f ([],   source') = pull $ tail source'
-
-consume :: Monad m => Source m o -> m [o]
-consume source =
-  pull source >>= maybe (return []) (\x-> (fst x:) <$> consume (snd x))
+instance Monad m => Functor (Source m) where
+  fmap f = transducer $ \i source->
+    (Source $ return $ Just (f i, fmap f source))
