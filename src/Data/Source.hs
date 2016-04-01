@@ -1,33 +1,44 @@
 {-# LANGUAGE TupleSections #-}
 module Data.Source where
 
-import Control.Arrow ((&&&))
 import Control.Monad
 import System.IO
 
 -- |
 --
 -- * A source that once returned Nothing must always return Nothing in the future
-newtype Source     m o   = Source { pull :: m (Maybe (o, Source m o)) }
-type    Transducer m i o = Source m i -> Source m o
+type Source     m a = m (Yield m a)
+type Transducer m a = Source m a -> Source m a
 
-term  :: Monad m => Source m o
-term   = Source (return Nothing)
+data Yield m a
+   = Yield a (Source m a)
+   | Exhaustion
+   | Termination
 
-push  :: Monad m => o -> Source m o -> Source m o
-push   = curry (Source . return . Just)
+drain    :: Monad m => Source m a -> m ()
+drain     = (=<<) f
+  where
+    f (Yield _ src) = drain src
+    f _             = return ()
 
-peek  :: Monad m => Source m o -> m (Maybe (o, Source m o))
-peek   = fmap (fmap (fst &&& uncurry push)) . pull
+peek     :: Monad m => Source m a -> m (Maybe a, Source m a)
+peek      = fmap f
+  where
+    f (Yield a src') = (Just a, return $ Yield a $ prepend a src')
+    f x              = (Nothing, return x)
 
-drain :: Monad m => Source m o -> m ()
-drain  = (=<<) (maybe (return ()) (drain . snd)) . pull
+prepend  :: Monad m => a -> Source m a -> Source m a
+prepend a = return . Yield a
 
-transducer :: Monad m => (i -> Transducer m i o) -> Transducer m i o
-transducer f source = Source $ pull source >>= \m-> case m of
-  Nothing            -> return Nothing
-  Just (i, source')  -> pull $ f i source'
+instance Monad m => Functor (Yield m) where
+  fmap f (Yield a src)       = Yield (f a) (fmap f <$> src)
+  fmap f Exhaustion          = Exhaustion
+  fmap f Termination         = Termination
 
-instance Monad m => Functor (Source m) where
-  fmap f = transducer $ \i source->
-    (Source $ return $ Just (f i, fmap f source))
+instance Monad m => Applicative (Yield m) where
+  pure                      a = Yield a (return Termination)
+  Yield f sf  <*>  Yield a sa = Yield (f a) $ sf >>= \g-> liftM (g <*>) sa
+  Exhaustion  <*>           _ = Exhaustion
+  _           <*>  Exhaustion = Exhaustion
+  Termination <*>           _ = Termination
+  _           <*> Termination = Termination

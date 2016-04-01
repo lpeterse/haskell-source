@@ -7,29 +7,23 @@ import System.IO
 import Prelude hiding (length)
 
 hGetSource  :: Handle -> Int -> Source IO ByteString
-hGetSource h i = Source $ do
+hGetSource h i = do
   bs <- hGet h i
-  return $ Just (bs, hGetSource h i)
-
-take :: Monad m => Int -> Transducer m [i] [i]
-take i source = Source $ pull source >>= \m-> case m of
-  Nothing -> return Nothing
-  Just xs -> undefined
+  prepend bs $ hGetSource h i
 
 stopAfter :: Int -> Source IO ByteString -> Source IO Int
-stopAfter iMax source = Source $ loop 0 source
+stopAfter iMax = loop 0
   where
-    loop i source
-      | i >= iMax = return $ Just (i, term)
-      | otherwise = pull source >>= \m->
-          case m of
-            Nothing            -> return Nothing
-            Just (bs, source') -> loop (i + length bs) source'
+    loop i sa
+      | i >= iMax = pure $ pure i
+      | otherwise = do
+        (Yield a sa') <- sa
+        loop (i + length a) sa'
 
 main :: IO ()
 main  = do
   h <- openFile "/dev/zero" ReadMode
-  x <- pull $ stopAfter 10000000000 $ hGetSource h 4096
+  x <- stopAfter 10000000000 $ hGetSource h 4096
   case x of
-    Nothing    -> error "source terminated"
-    Just (x,_) -> print x
+    Yield a _  -> print a
+    _          -> error "source terminated"
