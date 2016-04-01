@@ -1,12 +1,8 @@
-{-# LANGUAGE TupleSections #-}
 module Data.Source where
 
 import Control.Monad
 import Prelude hiding ( repeat, replicate )
 
--- |
---
--- * A source that once returned Nothing must always return Nothing in the future
 type Source     m a = m (Yield m a)
 type Transducer m a = Source m a -> Source m a
 
@@ -20,9 +16,9 @@ drain         = let f (Yield _ src) = drain src
                     f _             = return ()
                 in  (=<<) f
 
-peek         :: Monad m => Source m a -> m (Maybe a, Source m a)
-peek          = let f (Yield a sa) = (Just a, return $ Yield a $ prepend a sa)
-                    f x            = (Nothing, return x)
+peek         :: Monad m => Source m a -> Source m a
+peek          = let f (Yield a sa) = Yield a $ prepend a sa
+                    f ya           = ya
                 in  fmap f
 
 prepend      :: Monad m => a -> Source m a -> Source m a
