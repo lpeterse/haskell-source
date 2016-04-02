@@ -61,17 +61,17 @@ replicate 0 _ = pure $ Complete undefined
 replicate i a = pure $ Chunk a $ replicate (pred i) a
 
 instance Monad m => Functor (Yield m c) where
-  fmap f (Chunk a src)       = Chunk (f a) (fmap f <$> src)
-  fmap f (Complete g)        = Complete (\c-> fmap f <$> g c)
-  fmap f (Incomplete g)      = Incomplete (\c-> fmap f <$> g c)
+  fmap f (Chunk a src)            = Chunk (f a) (fmap f <$> src)
+  fmap f (Complete g)             = Complete (\c-> fmap f <$> g c)
+  fmap f (Incomplete g)           = Incomplete (\c-> fmap f <$> g c)
 
 instance Monad m => Applicative (Yield m c) where
   pure                          a = fix $ Chunk a . pure
   Chunk f sf    <*>    Chunk a sa = Chunk (f a) $ sf >>= \g-> liftM (g <*>) sa
-  Complete ca   <*>            yb = Complete   (ca >=> \ya-> pure (ya <*> yb))
-  ya            <*>   Complete cb = Complete   (cb >=> \yb-> pure (ya <*> yb))
-  Incomplete ca <*>            yb = Incomplete (ca >=> \ya-> pure (ya <*> yb))
-  ya            <*> Incomplete cb = Incomplete (cb >=> \yb-> pure (ya <*> yb))
+  Complete ca   <*>            yb = Complete   $ ca >=> pure . (<*> yb)
+  ya            <*>   Complete cb = Complete   $ cb >=> pure . (ya <*>)
+  Incomplete ca <*>            yb = Incomplete $ ca >=> pure . (<*> yb)
+  ya            <*> Incomplete cb = Incomplete $ cb >=> pure . (ya <*>)
 
 instance Monad m => Monoid (Yield m a a) where
   Chunk a sa  `mappend`    yb = Chunk a (f sa)
@@ -88,12 +88,12 @@ mapChunk :: Functor m => (a -> Source m c a -> Yield m c b) -> Transducer m c a 
 mapChunk f = fmap g
   where
     g (Chunk a sa)   = f a sa
-    g (Complete h)   = Complete $ mapChunk f . h
+    g (Complete h)   = Complete   $ mapChunk f . h
     g (Incomplete h) = Incomplete $ mapChunk f . h
 
 whenChunk :: Monad m => (a -> Source m c a -> Source m c b) -> Transducer m c a b
 whenChunk f = (=<<) g
   where
     g (Chunk a sa)   = f a sa
-    g (Complete h)   = pure $ Complete $ whenChunk f . h
+    g (Complete h)   = pure $ Complete   $ whenChunk f . h
     g (Incomplete h) = pure $ Incomplete $ whenChunk f . h
