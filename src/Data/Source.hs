@@ -34,14 +34,14 @@ data Yield m c a
    | Complete (Source m c c -> Source m c a)
    | Incomplete (Source m c c -> Source m c a)
 
-prepend    :: Monad m => a -> Source m c a -> Source m c a
-prepend     = (pure .) . Chunk
+prepend      :: Monad m => a -> Source m c a -> Source m c a
+prepend       = (pure .) . Chunk
 
-complete   :: Applicative m => (Source m c c -> Source m c a) -> Source m c a
-complete    = pure . Complete
+complete     :: Applicative m => (Source m c c -> Source m c a) -> Source m c a
+complete      = pure . Complete
 
-incomplete :: Applicative m => (Source m c c -> Source m c a) -> Source m c a
-incomplete  = pure . Incomplete
+incomplete   :: Applicative m => (Source m c c -> Source m c a) -> Source m c a
+incomplete    = pure . Incomplete
 
 drain        :: Monad m => Source m c a -> m ()
 drain         = let f (Chunk _ src) = drain src
@@ -73,7 +73,7 @@ instance Monad m => Applicative (Yield m c) where
   Incomplete ca <*>            yb = Incomplete (ca >=> \ya-> pure (ya <*> yb))
   ya            <*> Incomplete cb = Incomplete (cb >=> \yb-> pure (ya <*> yb))
 
-instance Monad m => Monoid (Yield m Void a) where
+instance Monad m => Monoid (Yield m a a) where
   Chunk a sa  `mappend`    yb = Chunk a (f sa)
     where
       f sc = sc >>= \yc-> pure $ case yc of
@@ -82,7 +82,7 @@ instance Monad m => Monoid (Yield m Void a) where
         Incomplete _ -> yb
   Complete _  `mappend`    yb = yb
   Incomplete _ `mappend`   yb = yb
-  mempty                      = Complete undefined
+  mempty                      = Complete id
 
 mapChunk :: Functor m => (a -> Source m c a -> Yield m c b) -> Transducer m c a b
 mapChunk f = fmap g
