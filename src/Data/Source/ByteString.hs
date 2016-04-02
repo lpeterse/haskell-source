@@ -6,12 +6,14 @@ import Data.Source
 import Data.Word
 import Prelude hiding ( head, null, take )
 
-head  :: Monad m => Transducer m BS.ByteString BS.ByteString (Word8, Source m BS.ByteString BS.ByteString)
-head   = mapChunk f
+head  :: Monad m => Transducer m c BS.ByteString (Word8, Source m c BS.ByteString)
+head   = whenChunk f
   where
-    f a sa | BS.null a = Complete head
-           | otherwise = Chunk (BS.head a, prepend (BS.tail a) sa)
-                               (head $ prepend (BS.tail a) sa)
+    f a sa | BS.null a = head sa
+           | otherwise = let h = BS.head a
+                             t = BS.tail a
+                         in  pure $ Chunk (h, prepend t sa)
+                                          (head $ prepend t sa)
 
 take  :: (Monad m, Integral i) => i -> Transducer m c BS.ByteString (BS.ByteString, Source m c BS.ByteString)
 take i = whenChunk f
