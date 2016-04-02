@@ -4,6 +4,7 @@ module Data.Source (
     Source,
     Yield (..),
     Transducer,
+    LookAheadTransducer,
 
     -- * Source primitives
     prepend,
@@ -26,8 +27,9 @@ import Data.Function
 import Data.Void
 import Prelude hiding ( repeat, replicate )
 
-type Source     m c a   = m (Yield m c a)
-type Transducer m c a b = Source m c a -> Source m c b
+type Source              m c a   = m (Yield m c a)
+type Transducer          m c a b = Source m c a -> Source m c b
+type LookAheadTransducer m c a b = Source m c a -> Source m c (b, Source m c a, Source m c a)
 
 data Yield m c a
    = Chunk a (Source m c a)
@@ -56,8 +58,8 @@ peek          = let f (Chunk a sa) = Chunk a $ prepend a sa
 repeat       :: Monad m => a -> Source m c a
 repeat      a = pure $ Chunk a $ repeat a
 
-replicate    :: (Monad m, Integral i) => i -> a -> Source m Void a
-replicate 0 _ = pure $ Complete undefined
+replicate    :: (Monad m, Integral i) => i -> a -> Source m a a
+replicate 0 _ = pure $ Complete id
 replicate i a = pure $ Chunk a $ replicate (pred i) a
 
 instance Monad m => Monoid (Yield m a a) where
