@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Data.Source (
     -- * Core types
     Source,
@@ -6,8 +7,8 @@ module Data.Source (
 
     -- * Source primitives
     prepend,
-    exhaust,
-    terminate,
+    complete,
+    incomplete,
 
     -- * Transducer combinators
     mapChunk,
@@ -21,76 +22,78 @@ module Data.Source (
   ) where
 
 import Control.Monad
+import Data.Function
+import Data.Void
 import Prelude hiding ( repeat, replicate )
 
-type Source     m a   = m (Yield m a)
-type Transducer m a b = Source m a -> Source m b
+type Source     m c a   = m (Yield m c a)
+type Transducer m c a b = Source m c a -> Source m c b
 
-data Yield m a
-   = Chunk a (Source m a)
-   | Terminal
-   | Exhaustion
+data Yield m c a
+   = Chunk a (Source m c a)
+   | Complete (Source m c c -> Source m c a)
+   | Incomplete (Source m c c -> Source m c a)
 
-prepend    :: Monad m => a -> Source m a -> Source m a
+prepend    :: Monad m => a -> Source m c a -> Source m c a
 prepend     = (pure .) . Chunk
 
-exhaust    :: Applicative m => Source m a
-exhaust     = pure Exhaustion
+complete   :: Applicative m => (Source m c c -> Source m c a) -> Source m c a
+complete    = pure . Complete
 
-terminate  :: Applicative m => Source m a
-terminate   = pure Terminal
+incomplete :: Applicative m => (Source m c c -> Source m c a) -> Source m c a
+incomplete  = pure . Incomplete
 
-drain        :: Monad m => Source m a -> m ()
+drain        :: Monad m => Source m c a -> m ()
 drain         = let f (Chunk _ src) = drain src
                     f _             = pure ()
                 in  (=<<) f
 
-peek         :: Monad m => Source m a -> Source m a
+peek         :: Monad m => Source m c a -> Source m c a
 peek          = let f (Chunk a sa) = Chunk a $ prepend a sa
                     f ya           = ya
                 in  fmap f
 
-repeat       :: Monad m => a -> Source m a
+repeat       :: Monad m => a -> Source m c a
 repeat      a = pure $ Chunk a $ repeat a
 
-replicate    :: (Monad m, Integral i) => i -> a -> Source m a
-replicate 0 _ = pure Terminal
+replicate    :: (Monad m, Integral i) => i -> a -> Source m Void a
+replicate 0 _ = pure $ Complete undefined
 replicate i a = pure $ Chunk a $ replicate (pred i) a
 
-instance Monad m => Functor (Yield m) where
+instance Monad m => Functor (Yield m c) where
   fmap f (Chunk a src)       = Chunk (f a) (fmap f <$> src)
-  fmap _ Exhaustion          = Exhaustion
-  fmap _ Terminal            = Terminal
+  fmap f (Complete g)        = Complete (\c-> fmap f <$> g c)
+  fmap f (Incomplete g)      = Incomplete (\c-> fmap f <$> g c)
 
-instance Monad m => Applicative (Yield m) where
-  pure                      a = Chunk a (pure Terminal)
-  Chunk f sf  <*>  Chunk a sa = Chunk (f a) $ sf >>= \g-> liftM (g <*>) sa
-  Exhaustion  <*>           _ = Exhaustion
-  _           <*>  Exhaustion = Exhaustion
-  Terminal <*>           _ = Terminal
-  _           <*> Terminal = Terminal
+instance Monad m => Applicative (Yield m c) where
+  pure                          a = fix $ Chunk a . pure
+  Chunk f sf    <*>    Chunk a sa = Chunk (f a) $ sf >>= \g-> liftM (g <*>) sa
+  Complete ca   <*>            yb = Complete   (ca >=> \ya-> pure (ya <*> yb))
+  ya            <*>   Complete cb = Complete   (cb >=> \yb-> pure (ya <*> yb))
+  Incomplete ca <*>            yb = Incomplete (ca >=> \ya-> pure (ya <*> yb))
+  ya            <*> Incomplete cb = Incomplete (cb >=> \yb-> pure (ya <*> yb))
 
-instance Monad m => Monoid (Yield m a) where
+instance Monad m => Monoid (Yield m Void a) where
   Chunk a sa  `mappend`    yb = Chunk a (f sa)
     where
-      f sc = sc >>= \yc-> case yc of
-        Chunk d sd  -> pure $ Chunk d (f sd)
-        Exhaustion  -> pure Exhaustion
-        Terminal -> pure yb
-  Exhaustion  `mappend`     _ = Exhaustion
-  Terminal `mappend`    yb = yb
-  mempty                      = Terminal
+      f sc = sc >>= \yc-> pure $ case yc of
+        Chunk d sd   -> Chunk d (f sd)
+        Complete _   -> yb
+        Incomplete _ -> yb
+  Complete _  `mappend`    yb = yb
+  Incomplete _ `mappend`   yb = yb
+  mempty                      = Complete undefined
 
-mapChunk :: Functor m => (a -> Source m a -> Yield m b) -> Transducer m a b
+mapChunk :: Functor m => (a -> Source m c a -> Yield m c b) -> Transducer m c a b
 mapChunk f = fmap g
   where
-    g (Chunk a sa) = f a sa
-    g Exhaustion   = Exhaustion
-    g Terminal  = Terminal
+    g (Chunk a sa)   = f a sa
+    g (Complete h)   = Complete $ mapChunk f . h
+    g (Incomplete h) = Incomplete $ mapChunk f . h
 
-whenChunk :: Monad m => (a -> Source m a -> Source m b) -> Transducer m a b
+whenChunk :: Monad m => (a -> Source m c a -> Source m c b) -> Transducer m c a b
 whenChunk f = (=<<) g
   where
-    g (Chunk a sa) = f a sa
-    g Exhaustion   = pure Exhaustion
-    g Terminal  = pure Terminal
+    g (Chunk a sa)   = f a sa
+    g (Complete h)   = pure $ Complete $ whenChunk f . h
+    g (Incomplete h) = pure $ Incomplete $ whenChunk f . h
