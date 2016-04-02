@@ -60,9 +60,20 @@ replicate    :: (Monad m, Integral i) => i -> a -> Source m Void a
 replicate 0 _ = pure $ Complete undefined
 replicate i a = pure $ Chunk a $ replicate (pred i) a
 
+instance Monad m => Monoid (Yield m a a) where
+  mempty                      = Complete id
+  Chunk a sa   `mappend`   yb = Chunk a (f sa)
+    where
+      f sc = sc >>= \yc-> pure $ case yc of
+        Chunk d sd   -> Chunk d (f sd)
+        Complete _   -> yb
+        Incomplete _ -> yb
+  Complete _   `mappend`   yb = yb
+  Incomplete _ `mappend`   yb = yb
+
 instance Monad m => Functor (Yield m c) where
-  fmap f (Chunk a src)            = Chunk (f a) (fmap f <$> src)
-  fmap f (Complete g)             = Complete (\c-> fmap f <$> g c)
+  fmap f (Chunk a src)            = Chunk     (f a) (fmap f <$> src)
+  fmap f (Complete g)             = Complete   (\c-> fmap f <$> g c)
   fmap f (Incomplete g)           = Incomplete (\c-> fmap f <$> g c)
 
 instance Monad m => Applicative (Yield m c) where
@@ -72,17 +83,6 @@ instance Monad m => Applicative (Yield m c) where
   ya            <*>   Complete cb = Complete   $ cb >=> pure . (ya <*>)
   Incomplete ca <*>            yb = Incomplete $ ca >=> pure . (<*> yb)
   ya            <*> Incomplete cb = Incomplete $ cb >=> pure . (ya <*>)
-
-instance Monad m => Monoid (Yield m a a) where
-  Chunk a sa  `mappend`    yb = Chunk a (f sa)
-    where
-      f sc = sc >>= \yc-> pure $ case yc of
-        Chunk d sd   -> Chunk d (f sd)
-        Complete _   -> yb
-        Incomplete _ -> yb
-  Complete _  `mappend`    yb = yb
-  Incomplete _ `mappend`   yb = yb
-  mempty                      = Complete id
 
 mapChunk :: Functor m => (a -> Source m c a -> Yield m c b) -> Transducer m c a b
 mapChunk f = fmap g
