@@ -4,7 +4,6 @@ module Data.Source (
     Source,
     Yield (..),
     Transducer,
-    LookAheadTransducer,
 
     -- * Source primitives
     prepend,
@@ -24,12 +23,10 @@ module Data.Source (
 
 import Control.Monad
 import Data.Function
-import Data.Void
 import Prelude hiding ( repeat, replicate )
 
 type Source              m c a   = m (Yield m c a)
 type Transducer          m c a b = Source m c a -> Source m c b
-type LookAheadTransducer m c a b = Source m c a -> Source m c (b, Source m c a, Source m c a)
 
 data Yield m c a
    = Chunk a (Source m c a)
