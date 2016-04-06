@@ -9,6 +9,7 @@ module Data.Source (
     prepend,
     complete,
     incomplete,
+    eval,
 
     -- * Transducer combinators
     mapChunk,
@@ -41,6 +42,9 @@ complete      = pure . Complete
 
 incomplete   :: Applicative m => (Source m c c -> Source m c a) -> Source m c a
 incomplete    = pure . Incomplete
+
+eval         :: Monad m => Source m c a -> Source m c a
+eval          = (=<<) pure
 
 drain        :: Monad m => Source m c a -> m ()
 drain         = let f (Chunk _ src) = drain src

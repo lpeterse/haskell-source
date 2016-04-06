@@ -19,3 +19,6 @@ consume = f []
       Complete continuation   -> prepend (reverse accum)
                                          (incomplete (consume . continuation))
       Incomplete continuation -> incomplete (f accum . continuation)
+
+fromList :: Monad m => [a] -> Source m c a
+fromList = undefined
