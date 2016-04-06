@@ -14,7 +14,7 @@ parse p = whenChunk $ f . A.parse p
     f (A.Done remains r)       = pure . Chunk r . parse p . prepend remains
     f A.Fail {}                = error "parser error"
 
-recognise :: (MonadThrow m, Monad m2) => A.Parser a -> Transducer m c BS.ByteString (Source m2 BS.ByteString BS.ByteString)
+recognise :: (MonadThrow m, Applicative f) => A.Parser a -> Transducer m c BS.ByteString (Source f BS.ByteString BS.ByteString)
 recognise p = whenChunk $ f [] . A.parse p
   where
     f consumed (A.Partial continuation) = whenChunk $ \a-> f (a:consumed) (continuation a)

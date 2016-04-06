@@ -20,5 +20,6 @@ consume = f []
                                          (incomplete (consume . continuation))
       Incomplete continuation -> incomplete (f accum . continuation)
 
-fromList :: Monad m => [a] -> Source m c a
-fromList = undefined
+fromList :: Applicative m => [a] -> Source m a a
+fromList []     = pure (Complete id)
+fromList (x:xs) = pure (Chunk x $ fromList xs)
