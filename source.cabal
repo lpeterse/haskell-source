@@ -17,9 +17,10 @@ library
   exposed-modules:     Data.Source,
                        Data.Source.Parser,
                        Data.Source.List,
-                       Data.Source.ByteString
+                       Data.Source.ByteString,
+                       Data.Source.Attoparsec
   ghc-options:         -Wall
-  build-depends:       base >=4.8 && < 5, bytestring
+  build-depends:       base >=4.8 && < 5, bytestring, attoparsec
   hs-source-dirs:      src
   default-language:    Haskell2010
 
