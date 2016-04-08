@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Data.Source (
     -- * Core types
-    Source,
+    Source (..),
     Yield (..),
     Transducer,
 
@@ -33,7 +33,8 @@ data    Yield m c a
       | Complete (Source m c c -> Source m c a)
       | Incomplete (Source m c c -> Source m c a)
 
-type Transducer          m c a b = Source m c a -> Source m c b
+type    Transducer m c a b
+      = Source m c a -> Source m c b
 
 prepend      :: Applicative m => a -> Source m c a -> Source m c a
 prepend a     = Source . pure .  Chunk a
@@ -73,21 +74,12 @@ instance Monad m => Monoid (Yield m a a) where
   Incomplete _ `mappend`   yb = yb
 
 instance Monad m => Functor (Yield m c) where
-  fmap f (Chunk a src)            = Chunk     (f a) (Source $ fmap f <$> pull src)
-  fmap f (Complete g)             = Complete   (\c-> Source $ fmap f <$> pull (g c))
-  fmap f (Incomplete g)           = Incomplete (\c-> Source $ fmap f <$> pull (g c))
+  fmap f (Chunk a src)  = Chunk (f a) (fmap f src)
+  fmap f (Complete g)   = Complete    (fmap f . g)
+  fmap f (Incomplete g) = Incomplete  (fmap f . g)
 
-instance Monad m => Applicative (Yield m c) where
-  pure                          a = fix $ Chunk a . Source . pure
-  Chunk f sf    <*>    Chunk a sa = Chunk (f a) $ Source $ pull sf >>= \g-> liftM (g <*>) (pull sa)
-  Complete ca   <*>            yb = Complete   $ \sa-> Source (pull sa >>= pure . (<*> yb))
-  ya            <*>   Complete cb = Complete   $ \sb-> Source (pull sb >>= pure . (ya <*>))
-  Incomplete ca <*>            yb = Incomplete $ \sa-> Source (pull sa >>= pure . (<*> yb))
-  ya            <*> Incomplete cb = Incomplete $ \sb-> Source (pull sb >>= pure . (ya <*>))
-
-instance Functor (Source m c) where
-instance Applicative (Source m c) where
-instance Monad (Source m c) where
+instance Monad m => Functor (Source m c) where
+  fmap f = Source . fmap (fmap f) . pull
 
 mapChunk :: Functor m => (a -> Source m c a -> Yield m c b) -> Transducer m c a b
 mapChunk f = Source . fmap g . pull
