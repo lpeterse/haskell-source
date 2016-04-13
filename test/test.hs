@@ -33,4 +33,14 @@ tgAttoparsecParse =
       "Parsing heads from multiple input ByteStrings with some being empty"
       ( Just ['a','b','c','d','e','f'] )
       ( toList $ parse anyChar $ fromList ["abc", "", "de", "", "", "f"] )
+
+  , testCase "004 anyChar" $ assertEqual
+      "Parsing heads from empty source"
+      ( Just [] )
+      ( toList $ parse anyChar $ fromList [] )
+
+  , testCase "005 anyChar" $ assertEqual
+      "Parsing heads from source with empty ByteStrin"
+      ( Just [] )
+      ( toList $ parse anyChar $ fromList [""] )
   ]
