@@ -23,11 +23,20 @@ library
   hs-source-dirs:      src
   default-language:    Haskell2010
 
-test-suite DrainDevZero
-  hs-source-dirs:      test
-  main-is:             DrainDevZero.hs
-  type:                exitcode-stdio-1.0
-  default-language:    Haskell2010
-  build-depends:       base >= 4.8 && < 5,
-                       bytestring < 0.11,
-                       source
+test-suite test
+  default-language:
+    Haskell2010
+  type:
+    exitcode-stdio-1.0
+  hs-source-dirs:
+    test
+  main-is:
+    test.hs
+  build-depends:
+      base >= 4.8 && < 5
+    , tasty >= 0.11
+    , tasty-hunit
+    , source
+    , bytestring
+    , attoparsec
+    , exceptions

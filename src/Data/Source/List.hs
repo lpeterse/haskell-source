@@ -1,5 +1,6 @@
 module Data.Source.List where
 
+import Control.Monad.Catch
 import Data.Source
 import Prelude hiding (take, head, tail)
 
@@ -22,6 +23,14 @@ consume = f [] . pull
       Incomplete continuation -> incomplete (f accum . continuation)
 -}
 
-fromList :: Applicative m => [a] -> Source m a a
+fromList       :: Applicative m => [a] -> Source m a a
 fromList []     = Source $ pure $ Complete id
 fromList (x:xs) = Source $ pure $ Chunk x $ fromList xs
+
+toList         :: MonadThrow m => Source m c a -> m [a]
+toList (Source sa) = do
+  ya <- sa
+  case ya of
+    Chunk a sb   -> (a:) <$> toList sb
+    Complete _   -> return []
+    Incomplete _ -> throwM Exhausted

@@ -8,11 +8,13 @@ import qualified Data.ByteString as BS
 import qualified Data.Attoparsec.ByteString as A
 
 parse :: MonadThrow m => A.Parser a -> Transducer m c BS.ByteString a
-parse p = whenChunk $ f . A.parse p
+parse p = whenChunk f
   where
-    f (A.Partial continuation) = whenChunk (f . continuation)
-    f (A.Done remains r)       = Source . pure . Chunk r . parse p . prepend remains
-    f A.Fail {}                = error "parser error"
+    f a sb | BS.null a = whenChunk f sb
+           | otherwise = g (A.parse p a) sb
+    g (A.Partial continuation) = whenChunk (g . continuation)
+    g (A.Done remains r)       = Source . pure . Chunk r . parse p . prepend remains
+    g (A.Fail a b c)           = error (show a ++ show b ++ show c)
 
 recognise :: (MonadThrow m, Applicative f) => A.Parser a -> Transducer m c BS.ByteString (Source f BS.ByteString BS.ByteString)
 recognise p = whenChunk $ f [] . A.parse p

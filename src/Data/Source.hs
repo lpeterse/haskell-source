@@ -4,6 +4,7 @@ module Data.Source (
     Source (..),
     Yield (..),
     Transducer,
+    SourceException (..),
 
     -- * Source primitives
     prepend,
@@ -21,8 +22,10 @@ module Data.Source (
     replicate
   ) where
 
+import Control.Exception
 import Control.Monad
 import Data.Function
+import Data.Typeable
 import Prelude hiding ( repeat, replicate )
 
 newtype Source m c a
@@ -94,3 +97,9 @@ whenChunk f = Source . (=<<) (pull . g) . pull
     g (Chunk a sa)   = f a sa
     g (Complete h)   = Source $ pure $ Complete   $ whenChunk f . h
     g (Incomplete h) = Source $ pure $ Incomplete $ whenChunk f . h
+
+data SourceException
+   = Exhausted
+   deriving (Typeable, Show)
+
+instance Exception SourceException where
