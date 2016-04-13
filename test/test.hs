@@ -9,21 +9,27 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 main :: IO ()
-main  = defaultMain $ testGroup "Data.Source" [tAttoparsec]
+main  = defaultMain $ testGroup "Data" [ testGroup "Source" [tgAttoparsec]]
 
-tAttoparsec :: TestTree
-tAttoparsec = testGroup "Data.Source.Attoparsec"
-  [ testCase "anyChar (001)" $ assertEqual
+tgAttoparsec :: TestTree
+tgAttoparsec = testGroup "Attoparsec"
+  [ tgAttoparsecParse
+  ]
+
+tgAttoparsecParse :: TestTree
+tgAttoparsecParse =
+  testGroup "parse"
+  [ testCase "001 anyChar" $ assertEqual
      "Parsing heads from single input ByteString"
       ( Just ['a','b','c'] )
       ( toList $ parse anyChar $ fromList ["abc"] )
 
-  , testCase "anyChar (002)" $ assertEqual
+  , testCase "002 anyChar" $ assertEqual
       "Parsing heads from multiple input ByteStrings"
       ( Just ['a','b','c','d','e','f'] )
       ( toList $ parse anyChar $ fromList ["abc", "d", "ef"] )
 
-  , testCase "anyChar (003)" $ assertEqual
+  , testCase "003 anyChar" $ assertEqual
       "Parsing heads from multiple input ByteStrings with some being empty"
       ( Just ['a','b','c','d','e','f'] )
       ( toList $ parse anyChar $ fromList ["abc", "", "de", "", "", "f"] )
