@@ -1,5 +1,6 @@
 module Data.Source.List where
 
+import Control.Monad
 import Data.Source
 import Prelude hiding (take, head, tail)
 
@@ -13,6 +14,9 @@ take i = f i []
 fromList       :: Applicative m => [a] -> Source m a a
 fromList []     = Source $ pure $ Complete id
 fromList (x:xs) = Source $ pure $ Chunk x $ fromList xs
+
+toList         :: MonadPlus m => Source m c a -> m [a]
+toList          = head . consume
 
 consume        :: Monad m => Source m c a -> Source m c [a]
 consume         = consume' id

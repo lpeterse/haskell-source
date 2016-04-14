@@ -67,7 +67,7 @@ replicate    :: (Monad m, Integral i) => i -> a -> Source m a a
 replicate 0 _ = Source $ pure $ Complete id
 replicate i a = Source $ pure $ Chunk a $ replicate (pred i) a
 
-head       :: (Show a, MonadPlus m) => Source m c a -> m a
+head       :: (MonadPlus m) => Source m c a -> m a
 head    sa  = do
   ya <- pull sa
   case ya of
