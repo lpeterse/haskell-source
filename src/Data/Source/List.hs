@@ -1,6 +1,5 @@
 module Data.Source.List where
 
-import Control.Monad.Catch
 import Data.Source
 import Prelude hiding (take, head, tail)
 
@@ -11,26 +10,15 @@ take i = f i []
     f 0 accum = Source . pure . Chunk (reverse accum) . take i
     f j accum = whenChunk (f (pred j) . (:accum))
 
-{-
-consume :: Monad m => Source m c a -> Source m c [a]
-consume = f [] . pull
-  where
-    f :: Monad m => [a] -> m (Yield m c a) -> Source m c [a]
-    f accum sa = Source $ sa >>= \ya-> case ya of
-      Chunk b sb              -> f (b:accum) sb
-      Complete continuation   -> prepend (reverse accum)
-                                         (incomplete (consume . continuation))
-      Incomplete continuation -> incomplete (f accum . continuation)
--}
-
 fromList       :: Applicative m => [a] -> Source m a a
 fromList []     = Source $ pure $ Complete id
 fromList (x:xs) = Source $ pure $ Chunk x $ fromList xs
 
-toList         :: MonadThrow m => Source m c a -> m [a]
-toList (Source sa) = do
-  ya <- sa
-  case ya of
-    Chunk a sb   -> (a:) <$> toList sb
-    Complete _   -> return []
-    Incomplete _ -> throwM Exhausted
+consume        :: Monad m => Source m c a -> Source m c [a]
+consume         = consume' id
+  where
+    consume'        :: Monad m => ([a] -> [a]) -> Source m c a -> Source m c [a]
+    consume' list sa = Source $ pull sa >>= \ya-> case ya of
+      Chunk     a sb -> pull $ consume' (list . (a:)) sb
+      Complete   fsb -> pure $ Chunk (list []) $ Source $ pure $ Incomplete (consume . fsb)
+      Incomplete fsb -> pure $ Incomplete (consume' list . fsb)

@@ -2,7 +2,7 @@ module Data.Source.ByteString where
 
 import qualified Data.ByteString as BS
 import Data.Monoid
-import Data.Source
+import Data.Source hiding ( head )
 import Data.Word
 import Prelude hiding ( head, null, take )
 

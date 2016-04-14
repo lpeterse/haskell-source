@@ -14,19 +14,21 @@ module Data.Source (
     -- * Transducer combinators
     mapChunk,
     whenChunk,
+    requireChunk,
 
     -- * Utils
     drain,
     peek,
     repeat,
-    replicate
+    replicate,
+    head
   ) where
 
 import Control.Exception
 import Control.Monad
 import Data.Function
 import Data.Typeable
-import Prelude hiding ( repeat, replicate )
+import Prelude hiding ( head, repeat, replicate )
 
 newtype Source m c a
       = Source { pull :: m (Yield m c a) }
@@ -65,6 +67,13 @@ replicate    :: (Monad m, Integral i) => i -> a -> Source m a a
 replicate 0 _ = Source $ pure $ Complete id
 replicate i a = Source $ pure $ Chunk a $ replicate (pred i) a
 
+head       :: (Show a, MonadPlus m) => Source m c a -> m a
+head    sa  = do
+  ya <- pull sa
+  case ya of
+    Chunk a _ -> pure a
+    _         -> mzero
+
 instance Monad m => Monoid (Yield m a a) where
   mempty                      = Complete id
   Chunk a sa   `mappend`   yb = Chunk a (f $ pull sa)
@@ -97,6 +106,13 @@ whenChunk f = Source . (=<<) (pull . g) . pull
     g (Chunk a sa)   = f a sa
     g (Complete h)   = Source $ pure $ Complete   $ whenChunk f . h
     g (Incomplete h) = Source $ pure $ Incomplete $ whenChunk f . h
+
+requireChunk :: Monad m => (a -> Source m c a -> Source m c b) -> Transducer m c a b
+requireChunk f = Source . (=<<) (pull . g) . pull
+  where
+    g (Chunk a sa)   = f a sa
+    g (Complete h)   = Source $ pure $ Incomplete $ requireChunk f . h
+    g (Incomplete h) = Source $ pure $ Incomplete $ requireChunk f . h
 
 data SourceException
    = Exhausted
