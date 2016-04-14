@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Control.Applicative
 import Control.Exception ( try )
 
 import Data.Source ( drain, head )
@@ -57,7 +56,5 @@ tgAttoparsecParse =
 
   , testCase "007 failure and exception" $ do
       e <- try $ drain $ parse (char 'x' :: Parser Char) $ fromList ["abc"]
-      case e of
-        Right ()                       -> assertFailure "Expected exception."
-        Left ae@AttoparsecException {} -> assertEqual "" (AttoparsecException ["x"] "Failed reading: satisfyWith") ae
+      assertEqual "" (Left $ AttoparsecException ["x"] "Failed reading: satisfyWith") e
   ]
