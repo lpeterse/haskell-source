@@ -1,10 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Data.Source (head)
+import Control.Applicative
+import Control.Exception ( try )
+
+import Data.Source ( drain, head )
 import Data.Source.List (consume, fromList)
 import Data.Source.Attoparsec
-import Data.Attoparsec.ByteString.Char8 (anyChar)
+import Data.Attoparsec.ByteString ( Parser )
+import Data.Attoparsec.ByteString.Char8 ( anyChar, char )
 
 import Prelude hiding (head)
 
@@ -46,7 +50,14 @@ tgAttoparsecParse =
       ( Just [('a','b'),('c','d')] )
       ( head $ consume $ parse (anyChar >>= \a-> anyChar >>= \b-> return (a,b)) $ fromList ["abcd"])
 
-  , testCase "006 tuples of two from odd ByteString" $ assertEqual ""
+  , testCase "006 tuples of two from odd ByteString" $ assertEqual
+      "The result shall be Nothing as there is a leftover in the pipe."
       Nothing
       ( head $ consume $ parse (anyChar >>= \a-> anyChar >>= \b-> return (a,b)) $ fromList ["abcde"])
+
+  , testCase "007 failure and exception" $ do
+      e <- try $ drain $ parse (char 'x' :: Parser Char) $ fromList ["abc"]
+      case e of
+        Right ()                       -> assertFailure "Expected exception."
+        Left ae@AttoparsecException {} -> assertEqual "" (AttoparsecException ["x"] "Failed reading: satisfyWith") ae
   ]
