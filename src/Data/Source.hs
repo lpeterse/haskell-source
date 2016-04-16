@@ -12,12 +12,12 @@ module Data.Source (
     incomplete,
 
     -- * Transducer combinators
-    mapChunk,
     whenChunk,
     requireChunk,
 
     -- * Utils
     drain,
+    each,
     peek,
     repeat,
     replicate,
@@ -49,6 +49,9 @@ complete      = Source . pure . Complete
 
 incomplete   :: Applicative m => (Source m c c -> Source m c a) -> Source m c a
 incomplete    = Source . pure . Incomplete
+
+each         :: Monad m => (a -> m ()) -> Transducer m c a a
+each f        = whenChunk $ \a sb-> Source $ f a >> pull (prepend a $ each f sb)
 
 drain        :: Monad m => Source m c a -> m ()
 drain         = let f (Chunk _ src) = drain src
@@ -92,13 +95,6 @@ instance Monad m => Functor (Yield m c) where
 
 instance Monad m => Functor (Source m c) where
   fmap f = Source . fmap (fmap f) . pull
-
-mapChunk :: Functor m => (a -> Source m c a -> Yield m c b) -> Transducer m c a b
-mapChunk f = Source . fmap g . pull
-  where
-    g (Chunk a sa)   = f a sa
-    g (Complete h)   = Complete   $ mapChunk f . h
-    g (Incomplete h) = Incomplete $ mapChunk f . h
 
 whenChunk :: Monad m => (a -> Source m c a -> Source m c b) -> Transducer m c a b
 whenChunk f = Source . (=<<) (pull . g) . pull

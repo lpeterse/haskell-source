@@ -18,7 +18,7 @@ head   = whenChunk f
 take  :: (Monad m, Integral i) => i -> Transducer m c BS.ByteString (BS.ByteString, Source m c BS.ByteString)
 take i = whenChunk f
   where
-    f a sa | j < i     = mapChunk g $ take (i - j) sa
+    f a sa | j < i     = whenChunk g $ take (i - j) sa
            | j == i    = Source $ pure $ Chunk (a, sa) (take i sa)
            | otherwise = Source
                        $ pure
@@ -29,4 +29,4 @@ take i = whenChunk f
         j           = fromIntegral $ BS.length a
         ta          = BS.take (fromIntegral i) a
         da          = BS.drop (fromIntegral i) a
-        g (b, sb) _ = Chunk (a <> b, sb) (take i sb)
+        g (b, sb) _ = Source $ pure $ Chunk (a <> b, sb) (take i sb)
